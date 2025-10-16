@@ -1,0 +1,24 @@
+# Fichiers de sauvegarde
+*.backup
+*.bak
+*~
+
+# Logs
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers de mot de passe (ne pas commiter)
+*-info.txt
+passwords.txt
+credentials.txt
+
+# Répertoires temporaires
+tmp/
+temp/
