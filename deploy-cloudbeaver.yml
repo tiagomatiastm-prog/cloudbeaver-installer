@@ -20,8 +20,6 @@
     - name: Installation de CloudBeaver via curl
       shell: curl -fsSL https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | bash
       register: installation_output
-      args:
-        warn: false
 
     - name: Affichage du résultat de l'installation
       debug:
