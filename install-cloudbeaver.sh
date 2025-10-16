@@ -59,9 +59,20 @@ log "=========================================="
 log "Mise à jour du système..."
 apt-get update >> "$LOG_FILE" 2>&1
 
-# Installation de Java (OpenJDK 17)
-log "Installation de Java OpenJDK 17..."
-apt-get install -y openjdk-17-jre-headless wget unzip curl >> "$LOG_FILE" 2>&1
+# Détection de la version de Debian pour installer le bon paquet Java
+DEBIAN_VERSION=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2 | cut -d'.' -f1)
+
+if [ "$DEBIAN_VERSION" -ge 13 ]; then
+    # Debian 13+ (trixie) : OpenJDK 21
+    JAVA_PACKAGE="openjdk-21-jre-headless"
+    log "Installation de Java OpenJDK 21 (Debian $DEBIAN_VERSION)..."
+else
+    # Debian 12 et antérieur : OpenJDK 17
+    JAVA_PACKAGE="openjdk-17-jre-headless"
+    log "Installation de Java OpenJDK 17 (Debian $DEBIAN_VERSION)..."
+fi
+
+apt-get install -y $JAVA_PACKAGE wget unzip curl >> "$LOG_FILE" 2>&1
 
 # Vérification de Java
 java -version >> "$LOG_FILE" 2>&1 || error "L'installation de Java a échoué"
