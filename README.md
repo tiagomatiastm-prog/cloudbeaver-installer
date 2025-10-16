@@ -1,55 +1,55 @@
 # CloudBeaver Installer
 
-Installation automatisée de CloudBeaver sur Debian 12/13 avec support PostgreSQL et Oracle.
+Installation automatisée de CloudBeaver via Docker sur Debian 12/13 avec support PostgreSQL, MySQL, Oracle et MongoDB.
 
 ## Description
 
-CloudBeaver est une interface web open-source pour gérer des bases de données. Cette solution d'installation automatisée permet de déployer rapidement CloudBeaver avec les drivers JDBC pour PostgreSQL et Oracle.
+CloudBeaver est une interface web open-source pour gérer des bases de données. Cette solution d'installation automatisée permet de déployer rapidement CloudBeaver 25.2.2 via Docker avec tous les drivers JDBC nécessaires.
 
 ### Fonctionnalités
 
-- Installation automatique de Java OpenJDK 17
-- Téléchargement et installation de CloudBeaver 24.3.4
+- Installation automatique de Docker et Docker Compose
+- Déploiement de CloudBeaver 25.2.2 via container Docker
 - Configuration du service systemd
-- Driver PostgreSQL pré-installé
-- Support pour driver Oracle (installation manuelle)
-- Génération automatique de mot de passe
+- Support multi-bases de données (PostgreSQL, MySQL, Oracle, MongoDB, etc.)
+- Génération automatique de mot de passe admin
 - Déploiement manuel (script Bash) ou automatisé (Ansible)
+- Persistence des données via volumes Docker
 
 ## Prérequis
 
 - Debian 12 ou 13
 - Accès root ou sudo
 - Minimum 2 Go de RAM (4 Go recommandés)
-- Minimum 1 Go d'espace disque libre
+- Minimum 2 Go d'espace disque libre
 - Connexion internet
 
 ## Installation rapide
 
 ### Méthode 1 : Installation directe (recommandée)
 
-Installation en une seule commande via wget :
-
-```bash
-wget -qO- https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | sudo bash
-```
-
-Ou avec curl :
+Installation en une seule commande via curl :
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | sudo bash
 ```
 
+Ou avec wget :
+
+```bash
+wget -qO- https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | sudo bash
+```
+
 Pour télécharger le script et l'exécuter séparément :
 
 ```bash
-# Avec wget
-wget https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
+# Avec curl
+curl -O https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
 chmod +x install-cloudbeaver.sh
 sudo ./install-cloudbeaver.sh
 
-# Avec curl
-curl -O https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
+# Avec wget
+wget https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
 chmod +x install-cloudbeaver.sh
 sudo ./install-cloudbeaver.sh
 ```
@@ -71,33 +71,28 @@ Après l'installation, CloudBeaver est accessible via :
 http://VOTRE_IP:8978
 ```
 
-Lors de la première connexion, vous devrez créer le compte administrateur. Le mot de passe suggéré est disponible dans `/root/cloudbeaver-info.txt`.
+Les identifiants de connexion sont générés automatiquement et sauvegardés dans `/root/cloudbeaver-info.txt`.
 
 ## Configuration des bases de données
 
-### PostgreSQL
+### PostgreSQL, MySQL, MongoDB
 
-Le driver PostgreSQL est installé automatiquement. Vous pouvez ajouter des connexions directement depuis l'interface web.
+Les drivers sont déjà inclus dans l'image Docker. Vous pouvez ajouter des connexions directement depuis l'interface web.
 
 ### Oracle Database
 
-Le driver Oracle nécessite une installation manuelle :
-
-1. Télécharger `ojdbc11.jar` depuis [Oracle](https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html)
-2. Copier le fichier dans `/opt/cloudbeaver/drivers/oracle/`
-3. Redémarrer le service : `systemctl restart cloudbeaver`
-
-Voir [DEPLOYMENT.md](DEPLOYMENT.md#configuration-oracle) pour plus de détails.
+Pour Oracle, une configuration supplémentaire peut être nécessaire. Consultez la [documentation officielle](https://cloudbeaver.io/docs/).
 
 ## Structure du projet
 
 ```
 cloudbeaver-installer/
-├── install-cloudbeaver.sh    # Script d'installation principal
-├── deploy-cloudbeaver.yml    # Playbook Ansible
-├── inventory.ini             # Inventaire Ansible
-├── DEPLOYMENT.md             # Guide de déploiement détaillé
-└── README.md                 # Ce fichier
+├── install-cloudbeaver.sh       # Script d'installation principal
+├── deploy-cloudbeaver.yml       # Playbook Ansible
+├── inventory.ini                # Inventaire Ansible
+├── docker-compose.example.yml   # Exemple de configuration Docker Compose
+├── DEPLOYMENT.md                # Guide de déploiement détaillé
+└── README.md                    # Ce fichier
 ```
 
 ## Documentation
@@ -112,14 +107,33 @@ cloudbeaver-installer/
 # Statut du service
 systemctl status cloudbeaver
 
+# Statut du container Docker
+docker ps | grep cloudbeaver
+
+# Logs en temps réel
+docker logs -f cloudbeaver
+
 # Redémarrer le service
 systemctl restart cloudbeaver
 
-# Voir les logs
-journalctl -u cloudbeaver -f
-
 # Informations d'installation
 cat /root/cloudbeaver-info.txt
+```
+
+## Gestion Docker
+
+```bash
+# Entrer dans le container
+docker exec -it cloudbeaver /bin/bash
+
+# Arrêter le container
+docker stop cloudbeaver
+
+# Démarrer le container
+docker start cloudbeaver
+
+# Recréer le container
+cd /opt/cloudbeaver && docker compose up -d --force-recreate
 ```
 
 ## Ports utilisés
@@ -145,9 +159,9 @@ Ce projet est fourni "tel quel" sans garantie. Utilisation à vos propres risque
 
 ## Versions
 
-- **CloudBeaver** : 24.3.4
-- **Java** : OpenJDK 17
-- **Driver PostgreSQL** : 42.7.4
+- **CloudBeaver** : 25.2.2
+- **Docker** : Latest (installé automatiquement)
+- **Docker Compose** : Plugin v2 (installé automatiquement)
 - **Systèmes supportés** : Debian 12/13
 
 ---

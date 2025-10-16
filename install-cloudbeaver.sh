@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #############################################
-# Script d'installation de CloudBeaver
+# Script d'installation de CloudBeaver via Docker
 # Pour Debian 12/13
 # Auteur: Tiago
 # Date: 2025-10-16
@@ -17,11 +17,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Variables
-CLOUDBEAVER_VERSION="24.3.4"
+CLOUDBEAVER_VERSION="25.2.2"
 CLOUDBEAVER_DIR="/opt/cloudbeaver"
-CLOUDBEAVER_USER="cloudbeaver"
 LOG_FILE="/var/log/cloudbeaver-installation.log"
 INFO_FILE="/root/cloudbeaver-info.txt"
+CLOUDBEAVER_PORT="8978"
 
 # Fonction d'affichage
 log() {
@@ -52,124 +52,125 @@ if ! grep -qi "debian" /etc/os-release; then
 fi
 
 log "=========================================="
-log "Installation de CloudBeaver $CLOUDBEAVER_VERSION"
+log "Installation de CloudBeaver $CLOUDBEAVER_VERSION via Docker"
 log "=========================================="
 
 # Mise à jour du système
 log "Mise à jour du système..."
 apt-get update >> "$LOG_FILE" 2>&1
 
-# Détection de la version de Debian pour installer le bon paquet Java
-DEBIAN_VERSION=$(grep VERSION_ID /etc/os-release | cut -d'"' -f2 | cut -d'.' -f1)
+# Installation des prérequis
+log "Installation des paquets requis..."
+apt-get install -y ca-certificates curl gnupg lsb-release >> "$LOG_FILE" 2>&1
 
-if [ "$DEBIAN_VERSION" -ge 13 ]; then
-    # Debian 13+ (trixie) : OpenJDK 21
-    JAVA_PACKAGE="openjdk-21-jre-headless"
-    log "Installation de Java OpenJDK 21 (Debian $DEBIAN_VERSION)..."
+# Installation de Docker
+log "Vérification de l'installation de Docker..."
+if ! command -v docker &> /dev/null; then
+    log "Installation de Docker..."
+
+    # Ajout de la clé GPG officielle Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+
+    # Ajout du dépôt Docker
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt-get update >> "$LOG_FILE" 2>&1
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1
+
+    # Démarrage de Docker
+    systemctl start docker
+    systemctl enable docker
+
+    log "Docker installé avec succès"
 else
-    # Debian 12 et antérieur : OpenJDK 17
-    JAVA_PACKAGE="openjdk-17-jre-headless"
-    log "Installation de Java OpenJDK 17 (Debian $DEBIAN_VERSION)..."
+    log "Docker est déjà installé"
 fi
 
-apt-get install -y $JAVA_PACKAGE wget unzip curl >> "$LOG_FILE" 2>&1
+# Vérification de Docker
+docker --version >> "$LOG_FILE" 2>&1 || error "L'installation de Docker a échoué"
+docker compose version >> "$LOG_FILE" 2>&1 || error "Docker Compose n'est pas disponible"
 
-# Vérification de Java
-java -version >> "$LOG_FILE" 2>&1 || error "L'installation de Java a échoué"
-log "Java installé avec succès"
-
-# Création de l'utilisateur CloudBeaver
-log "Création de l'utilisateur système $CLOUDBEAVER_USER..."
-if ! id "$CLOUDBEAVER_USER" &>/dev/null; then
-    useradd -r -s /bin/false -d "$CLOUDBEAVER_DIR" "$CLOUDBEAVER_USER"
-    log "Utilisateur $CLOUDBEAVER_USER créé"
-else
-    warning "L'utilisateur $CLOUDBEAVER_USER existe déjà"
-fi
-
-# Téléchargement de CloudBeaver
-log "Téléchargement de CloudBeaver $CLOUDBEAVER_VERSION..."
-cd /tmp
-DOWNLOAD_URL="https://github.com/dbeaver/cloudbeaver/releases/download/${CLOUDBEAVER_VERSION}/cloudbeaver-${CLOUDBEAVER_VERSION}.zip"
-
-wget -q --show-progress "$DOWNLOAD_URL" -O cloudbeaver.zip || error "Échec du téléchargement de CloudBeaver"
-
-# Extraction de CloudBeaver
-log "Extraction de CloudBeaver..."
-unzip -q cloudbeaver.zip -d /tmp/ || error "Échec de l'extraction"
-
-# Installation dans /opt
-log "Installation de CloudBeaver dans $CLOUDBEAVER_DIR..."
+# Création du répertoire CloudBeaver
+log "Création du répertoire d'installation..."
 if [ -d "$CLOUDBEAVER_DIR" ]; then
     warning "Le répertoire $CLOUDBEAVER_DIR existe déjà, sauvegarde..."
     mv "$CLOUDBEAVER_DIR" "${CLOUDBEAVER_DIR}.backup.$(date +%Y%m%d%H%M%S)"
 fi
 
-mv /tmp/cloudbeaver "$CLOUDBEAVER_DIR"
-chown -R "$CLOUDBEAVER_USER:$CLOUDBEAVER_USER" "$CLOUDBEAVER_DIR"
-chmod +x "$CLOUDBEAVER_DIR/run-server.sh"
-
-# Installation des drivers JDBC
-log "Installation des drivers JDBC pour PostgreSQL et Oracle..."
-
-# Driver PostgreSQL
-POSTGRES_DRIVER_VERSION="42.7.4"
-POSTGRES_DRIVER_URL="https://jdbc.postgresql.org/download/postgresql-${POSTGRES_DRIVER_VERSION}.jar"
-wget -q "$POSTGRES_DRIVER_URL" -O "$CLOUDBEAVER_DIR/drivers/postgresql/postgresql-${POSTGRES_DRIVER_VERSION}.jar" || warning "Échec du téléchargement du driver PostgreSQL"
-
-# Driver Oracle (ojdbc11 pour Oracle 21c)
-info "Pour Oracle, le driver doit être téléchargé manuellement depuis Oracle (licence)"
-info "Téléchargez ojdbc11.jar depuis: https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html"
-info "Et placez-le dans: $CLOUDBEAVER_DIR/drivers/oracle/"
-mkdir -p "$CLOUDBEAVER_DIR/drivers/oracle"
-chown -R "$CLOUDBEAVER_USER:$CLOUDBEAVER_USER" "$CLOUDBEAVER_DIR/drivers"
-
-# Configuration de CloudBeaver
-log "Configuration de CloudBeaver..."
+mkdir -p "$CLOUDBEAVER_DIR"
+mkdir -p "$CLOUDBEAVER_DIR/workspace"
 
 # Génération du mot de passe admin
 ADMIN_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-16)
 
-# Configuration du fichier server.xml si nécessaire
-# CloudBeaver se configure via l'interface web au premier démarrage
+# Création du fichier docker-compose.yml
+log "Création du fichier docker-compose.yml..."
+cat > "$CLOUDBEAVER_DIR/docker-compose.yml" << EOF
+version: '3.8'
+
+services:
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:${CLOUDBEAVER_VERSION}
+    container_name: cloudbeaver
+    restart: unless-stopped
+    ports:
+      - "${CLOUDBEAVER_PORT}:8978"
+    volumes:
+      - ./workspace:/opt/cloudbeaver/workspace
+    environment:
+      - CB_SERVER_NAME=CloudBeaver
+      - CB_SERVER_URL=http://localhost:${CLOUDBEAVER_PORT}
+      - CB_ADMIN_NAME=admin
+      - CB_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    networks:
+      - cloudbeaver-network
+
+networks:
+  cloudbeaver-network:
+    driver: bridge
+EOF
 
 # Création du service systemd
 log "Création du service systemd..."
 cat > /etc/systemd/system/cloudbeaver.service << EOF
 [Unit]
-Description=CloudBeaver Server
-After=network.target
+Description=CloudBeaver Docker Container
+Requires=docker.service
+After=docker.service
 
 [Service]
-Type=simple
-User=$CLOUDBEAVER_USER
-Group=$CLOUDBEAVER_USER
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=$CLOUDBEAVER_DIR
-ExecStart=$CLOUDBEAVER_DIR/run-server.sh
-Restart=on-failure
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Activation et démarrage du service
-log "Activation et démarrage du service CloudBeaver..."
+# Démarrage de CloudBeaver
+log "Démarrage de CloudBeaver..."
+cd "$CLOUDBEAVER_DIR"
 systemctl daemon-reload
 systemctl enable cloudbeaver >> "$LOG_FILE" 2>&1
 systemctl start cloudbeaver >> "$LOG_FILE" 2>&1
 
 # Attente du démarrage
-log "Attente du démarrage de CloudBeaver..."
-sleep 10
+log "Attente du démarrage de CloudBeaver (30 secondes)..."
+sleep 30
 
 # Vérification du statut
-if systemctl is-active --quiet cloudbeaver; then
+if docker ps | grep -q cloudbeaver; then
     log "CloudBeaver est démarré avec succès"
 else
-    error "CloudBeaver n'a pas démarré correctement. Vérifiez les logs: journalctl -u cloudbeaver"
+    error "CloudBeaver n'a pas démarré correctement. Vérifiez les logs: docker logs cloudbeaver"
 fi
 
 # Récupération de l'adresse IP
@@ -183,38 +184,48 @@ Informations d'installation CloudBeaver
 ========================================
 Date d'installation: $(date)
 Version CloudBeaver: $CLOUDBEAVER_VERSION
+Méthode d'installation: Docker
 
 Installation:
 - Répertoire: $CLOUDBEAVER_DIR
-- Utilisateur système: $CLOUDBEAVER_USER
-- Port par défaut: 8978
+- Port: $CLOUDBEAVER_PORT
+- Container Docker: cloudbeaver
 
 Accès Web:
-- URL: http://$IP_ADDRESS:8978
-- Premier utilisateur admin à créer lors de la première connexion
-- Mot de passe suggéré: $ADMIN_PASSWORD
-
-Drivers JDBC installés:
-- PostgreSQL: Version $POSTGRES_DRIVER_VERSION
-- Oracle: À installer manuellement (voir documentation)
+- URL: http://$IP_ADDRESS:$CLOUDBEAVER_PORT
+- Utilisateur admin: admin
+- Mot de passe admin: $ADMIN_PASSWORD
 
 Commandes utiles:
-- Statut: systemctl status cloudbeaver
+- Statut du service: systemctl status cloudbeaver
+- Statut du container: docker ps | grep cloudbeaver
+- Logs Docker: docker logs cloudbeaver
+- Logs en temps réel: docker logs -f cloudbeaver
 - Arrêt: systemctl stop cloudbeaver
 - Démarrage: systemctl start cloudbeaver
 - Redémarrage: systemctl restart cloudbeaver
-- Logs: journalctl -u cloudbeaver -f
+
+Gestion Docker:
+- Entrer dans le container: docker exec -it cloudbeaver /bin/bash
+- Arrêter le container: docker stop cloudbeaver
+- Démarrer le container: docker start cloudbeaver
+- Recréer le container: cd $CLOUDBEAVER_DIR && docker compose up -d --force-recreate
 
 Configuration:
-- Fichier de configuration: $CLOUDBEAVER_DIR/conf/
+- Fichier docker-compose: $CLOUDBEAVER_DIR/docker-compose.yml
 - Données: $CLOUDBEAVER_DIR/workspace/
 
 Prochaines étapes:
-1. Accédez à l'interface web: http://$IP_ADDRESS:8978
-2. Créez le premier compte administrateur
-3. Pour Oracle, téléchargez le driver JDBC depuis:
-   https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html
-   Et placez-le dans: $CLOUDBEAVER_DIR/drivers/oracle/
+1. Accédez à l'interface web: http://$IP_ADDRESS:$CLOUDBEAVER_PORT
+2. Connectez-vous avec les identifiants ci-dessus
+3. Configurez vos connexions de bases de données
+
+Support des bases de données:
+- PostgreSQL (driver inclus)
+- MySQL/MariaDB (driver inclus)
+- Oracle (nécessite configuration supplémentaire)
+- MongoDB (driver inclus)
+- Et bien d'autres...
 
 ========================================
 EOF
@@ -226,21 +237,14 @@ log "=========================================="
 log "Installation terminée avec succès!"
 log "=========================================="
 echo ""
-info "CloudBeaver est accessible à l'adresse: http://$IP_ADDRESS:8978"
+info "CloudBeaver est accessible à l'adresse: http://$IP_ADDRESS:$CLOUDBEAVER_PORT"
+info "Utilisateur: admin"
+info "Mot de passe: $ADMIN_PASSWORD"
 info "Informations sauvegardées dans: $INFO_FILE"
 info "Logs d'installation: $LOG_FILE"
 echo ""
-warning "IMPORTANT: Lors de la première connexion, vous devrez créer le compte administrateur"
-warning "Mot de passe suggéré: $ADMIN_PASSWORD"
-echo ""
-info "Pour Oracle DB, installez manuellement le driver ojdbc11.jar:"
-info "  1. Téléchargez depuis: https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html"
-info "  2. Placez dans: $CLOUDBEAVER_DIR/drivers/oracle/"
-info "  3. Redémarrez: systemctl restart cloudbeaver"
+warning "IMPORTANT: Changez le mot de passe administrateur après la première connexion"
 echo ""
 log "=========================================="
-
-# Nettoyage
-rm -f /tmp/cloudbeaver.zip
 
 exit 0
