@@ -88,6 +88,7 @@ Pour Oracle, une configuration supplémentaire peut être nécessaire. Consultez
 ```
 cloudbeaver-installer/
 ├── install-cloudbeaver.sh       # Script d'installation principal
+├── update-cloudbeaver.sh        # Script de mise à jour
 ├── deploy-cloudbeaver.yml       # Playbook Ansible
 ├── inventory.ini                # Inventaire Ansible
 ├── docker-compose.example.yml   # Exemple de configuration Docker Compose
@@ -134,6 +135,59 @@ docker start cloudbeaver
 
 # Recréer le container
 cd /opt/cloudbeaver && docker compose up -d --force-recreate
+```
+
+## Mise à jour
+
+### Méthode automatique (recommandée)
+
+Utilisez le script de mise à jour fourni :
+
+```bash
+# Télécharger le script
+curl -O https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/update-cloudbeaver.sh
+chmod +x update-cloudbeaver.sh
+
+# Exécuter la mise à jour
+sudo ./update-cloudbeaver.sh
+```
+
+Le script va :
+- Afficher la version actuelle
+- Demander la version cible (ex: 25.3.0 ou "latest")
+- Faire une sauvegarde du workspace
+- Arrêter le service
+- Mettre à jour l'image Docker
+- Redémarrer le service
+- Vérifier que tout fonctionne
+
+### Méthode manuelle
+
+```bash
+# 1. Arrêter le service
+sudo systemctl stop cloudbeaver
+
+# 2. Modifier la version dans docker-compose.yml
+cd /opt/cloudbeaver
+sudo nano docker-compose.yml
+# Changer: image: dbeaver/cloudbeaver:25.2.2
+# Vers:    image: dbeaver/cloudbeaver:25.3.0
+
+# 3. Mettre à jour
+sudo docker compose pull
+sudo docker compose up -d
+
+# 4. Redémarrer
+sudo systemctl start cloudbeaver
+```
+
+### Sauvegarde des données
+
+Les données utilisateurs sont automatiquement préservées lors des mises à jour grâce au volume Docker (`/opt/cloudbeaver/workspace/`).
+
+Pour une sauvegarde manuelle avant mise à jour :
+```bash
+sudo cp -r /opt/cloudbeaver/workspace /opt/cloudbeaver/workspace.backup
 ```
 
 ## Ports utilisés
