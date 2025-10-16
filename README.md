@@ -26,11 +26,30 @@ CloudBeaver est une interface web open-source pour gérer des bases de données.
 
 ## Installation rapide
 
-### Méthode 1 : Script Bash (local)
+### Méthode 1 : Installation directe (recommandée)
+
+Installation en une seule commande via wget :
 
 ```bash
-git clone https://github.com/tiagomatiastm-prog/cloudbeaver-installer.git
-cd cloudbeaver-installer
+wget -qO- https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | sudo bash
+```
+
+Ou avec curl :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | sudo bash
+```
+
+Pour télécharger le script et l'exécuter séparément :
+
+```bash
+# Avec wget
+wget https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
+chmod +x install-cloudbeaver.sh
+sudo ./install-cloudbeaver.sh
+
+# Avec curl
+curl -O https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
 chmod +x install-cloudbeaver.sh
 sudo ./install-cloudbeaver.sh
 ```
