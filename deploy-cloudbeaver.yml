@@ -17,15 +17,11 @@
           - ansible_distribution == "Debian"
         fail_msg: "Ce playbook est conçu uniquement pour Debian"
 
-    - name: Téléchargement du script d'installation
-      get_url:
-        url: https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh
-        dest: /tmp/install-cloudbeaver.sh
-        mode: '0755'
-
-    - name: Exécution du script d'installation
-      command: /tmp/install-cloudbeaver.sh
+    - name: Installation de CloudBeaver via curl
+      shell: curl -fsSL https://raw.githubusercontent.com/tiagomatiastm-prog/cloudbeaver-installer/master/install-cloudbeaver.sh | bash
       register: installation_output
+      args:
+        warn: false
 
     - name: Affichage du résultat de l'installation
       debug:
@@ -39,8 +35,3 @@
     - name: Affichage des informations de connexion
       debug:
         msg: "{{ cloudbeaver_info.content | b64decode }}"
-
-    - name: Nettoyage du script temporaire
-      file:
-        path: /tmp/install-cloudbeaver.sh
-        state: absent
