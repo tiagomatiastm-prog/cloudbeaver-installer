@@ -24,12 +24,3 @@
     - name: Affichage du résultat de l'installation
       debug:
         var: installation_output.stdout_lines
-
-    - name: Récupération des informations de connexion
-      slurp:
-        path: /root/cloudbeaver-info.txt
-      register: cloudbeaver_info
-
-    - name: Affichage des informations de connexion
-      debug:
-        msg: "{{ cloudbeaver_info.content | b64decode }}"
